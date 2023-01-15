@@ -41,14 +41,11 @@ public class FindTransPath {
         //样例1： 62319000001760*2131 62319000001760*2132 "2023-01-14 00:00:01" 30000
         //样例2： 62319000001760*21311  62319000001760*21312 "2023-01-15 00:00:01" 30000
         //样例3： 62170039700023*8300  62170039700012*4861 "2020-12-03 18:48:53" 50000
+        //样例4： 62284814504318*4218  62284833586016*5677  "2023-01-01 12:50:10" 300000
+        //样例5： 62284800869378*3679  62305233500121*0278  "2017-08-16 17:29:16" 300000
 
         //获取初始节点信息
         NodeInfo init = new NodeInfo(0, trans.cardId, trans.toCardId , Utils.getTimestamp( trans.dealTime, "yyyy-MM-dd HH:mm:ss"), trans.money);
-
-        //NodeInfo init = new NodeInfo(0, "62284814504318*4218", "62284833586016*5677", Utils.getTimestamp("2023-01-01 12:50:10", "yyyy-MM-dd HH:mm:ss"), 300000);
-
-        //NodeInfo init = new NodeInfo(0, "62284800869378*3679", "62305233500121*0278", Utils.getTimestamp("2017-08-16 17:29:16", "yyyy-MM-dd HH:mm:ss"), 300000);
-
 
         //初始化 消息列表，用于存储结果数据，每一层一个列表
         List<List<NodeInfo>> info= new ArrayList<List<NodeInfo>>();
@@ -165,71 +162,7 @@ public class FindTransPath {
     public List<NodeInfo> unionTransInfo(List<NodeInfo> nodeList, NodeInfo node, Queue<NodeInfo> queue)
     {
 
-//        //节点与队列进行比较
-//        for (NodeInfo qNode: queue) {
-//
-//            for (int j = 0; j < qNode.cardId.size(); j++) {
-//                //与历史节点相同  账号、目标账号、时间 相同
-//                if(node.cardId.get(0).equals(qNode.cardId.get(j)) &&
-//                        node.toCardId.equals(qNode.toCardId) &&
-//                        node.dealTime.get(0).equals(qNode.dealTime.get(0)))
-//                {
-//                    System.out.println("double node:"+node.cardId.get(0));
-//                    return nodeList;
-//                }
-//                else {
-//                    System.out.println("cardId:"+node.cardId.get(0)+"toCardId:"+node.toCardId+"cardId:"+qNode.cardId.get(0)+"toCardId:"+qNode.toCardId);
-//                }
-//            }
-//
-//        }
-//
-//
-//        //节点与历史层级进行比较
-//        for (int j = 0; j < info.size(); j++) {
-//            List<NodeInfo> infoList = info.get(j);
-//
-//            for (int k = 0; k < infoList.size(); k++) {
-//                NodeInfo p = infoList.get(k);
-//
-//                for (int l = 0; l < p.cardId.size(); l++) {
-//
-//                    //与历史节点相同  账号、目标账号、时间 相同
-//                    if(node.cardId.get(0).equals(p.cardId.get(l)) &&
-//                       node.toCardId.equals(p.toCardId) &&
-//                       node.dealTime.get(0).equals(p.dealTime.get(0)))
-//                    {
-//                        System.out.println("double node:"+node.cardId.get(0));
-//                        return nodeList;
-//                    }
-//                    else {
-//                        System.out.println("cardId:"+node.cardId.get(0)+"toCardId:"+node.toCardId+"cardId:"+p.cardId.get(0)+"toCardId:"+p.toCardId);
-//                    }
-//                }
-//            }
-//        }
-
-//        //节点与本层级的节点比较
-//        if(nodeList.size()==0)
-//            nodeList.add(node);
-//        else {
-//            for (int i = 0; i < nodeList.size(); i++) {
-//                NodeInfo n = nodeList.get(i);
-//
-//                System.out.println("n - toCardId:"+n.toCardId+", node - toCardId:"+node.toCardId+",level:"+node.level);
-//                //此层级的节点，与先插入到此层级的列表进行比较，如果目标相同对数据进行合并；
-//                if (n.toCardId.equals(node.toCardId)) {
-//                    n.totalMoney = n.totalMoney + node.totalMoney;
-//                    n.cardId.add(node.cardId.get(0));
-//                    n.money.add(node.money.get(0));
-//                    n.dealTime.add(node.dealTime.get(0));
-//                    return nodeList;
-//                }
-//            }
-//            nodeList.add(node);
-//        }
         for (NodeInfo qNode: queue) {
-            System.out.println("n - toCardId:" + qNode.toCardId + ", node - toCardId:" + node.toCardId + ",level:" + node.level);
             //此层级的节点，与先插入到此层级的列表进行比较，如果目标相同对数据进行合并；
             if (qNode.toCardId.equals(node.toCardId)) {
                 qNode.totalMoney = qNode.totalMoney + node.totalMoney;
@@ -353,8 +286,7 @@ public class FindTransPath {
 
         List<NodeInfo> nodeList = new ArrayList<NodeInfo>();
 
-        System.out.println("Node:"+nodeInfo+", Layer:"+layer);
-
+        //System.out.println("Node:"+nodeInfo+", Layer:"+layer);
 
         //访问neo4j获取账号交易信息
         //Driver driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("neo4j", "123456"));
@@ -365,7 +297,7 @@ public class FindTransPath {
         while(result.hasNext())
         {
             Record record = result.next();
-            System.out.println(record.get("cardId") +":"+record.get("toCardId"));
+            //System.out.println(record.get("cardId") +":"+record.get("toCardId"));
 
             NodeInfo n = new NodeInfo( layer, record.get("cardId").asString(), record.get("toCardId").asString(), Utils.getTimestamp(record.get("dealTime").asString(), "yyyy-MM-dd HH:mm:ss"), Double.valueOf(record.get("money").asString()));
 
@@ -379,49 +311,12 @@ public class FindTransPath {
             unionTransInfo(nodeList, n, queue);
 
         }
-        //session.close();
-        //driver.close();
-
-
-
-//        layer++;
-//        if (nodeInfo.toCardId.equals("22222")) {
-//
-//            NodeInfo t1 = new NodeInfo(layer, "22222", "33333", Utils.getTimestamp("2017-08-16 17:30:16", "yyyy-MM-dd HH:mm:ss"), 300000);
-//            unionTransInfo(nodeList, t1);
-//
-//            NodeInfo t2 = new NodeInfo(layer, "22222", "44444", Utils.getTimestamp("2017-08-16 17:31:16", "yyyy-MM-dd HH:mm:ss"), 300000);
-//            unionTransInfo(nodeList, t2);
-//
-//        }
-//
-//        if (nodeInfo.toCardId.equals("33333")) {
-//
-//            NodeInfo t1 = new NodeInfo(layer, "33333", "44444", Utils.getTimestamp("2017-08-16 17:32:16", "yyyy-MM-dd HH:mm:ss"), 300000);
-//            unionTransInfo(nodeList, t1);
-//
-//
-//        }
-//        if (nodeInfo.toCardId.equals("44444") ) {
-//
-//            NodeInfo t2 = new NodeInfo(layer, "44444", "55555", Utils.getTimestamp("2017-08-16 17:33:16", "yyyy-MM-dd HH:mm:ss"), 300000);
-//            unionTransInfo(nodeList, t2);
-//
-//        }
-//
-//        if (nodeInfo.toCardId.equals("55555")) {
-//
-//            NodeInfo t2 = new NodeInfo(layer, "55555", "666666", Utils.getTimestamp("2017-08-16 17:33:16", "yyyy-MM-dd HH:mm:ss"), 300000);
-//            unionTransInfo(nodeList, t2);
-//
-//        }
 
         if(nodeList.size() == 0)
         {
             endTransList.add(nodeInfo);
         }
 
-        System.out.println("List:" + nodeList);
         return nodeList;
     }
 
