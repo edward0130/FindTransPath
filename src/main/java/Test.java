@@ -14,6 +14,9 @@ import static org.neo4j.driver.Values.parameters;
 
 public class Test {
 
+    List<Integer> path = new ArrayList<>();
+    List<List<Integer>> result = new ArrayList<>();
+
 
     public static void main(String args[])
     {
@@ -52,63 +55,68 @@ public class Test {
         */
 
 
-
-        ArrayList<Integer> arr = new ArrayList<Integer>(5);
-        arr.add(220);
-        arr.add(115);
-        arr.add(320);
-        arr.add(145);
-
-        System.out.println("Size of list: " + arr.size());
-        for (Integer number : arr) {
-            System.out.println("Number = " + number);
-        }
-        arr.remove(2);
-
-        System.out.println("After remove, Size of list: " + arr.size());
-
-        int i=0;
-        for (Integer number : arr) {
-            System.out.println("Number = " + number);
-            if(i++==0)
-                arr.remove(0);
-        }
+//        ArrayList<Integer> arr = new ArrayList<Integer>(5);
+//        arr.add(220);
+//        arr.add(115);
+//        arr.add(320);
+//        arr.add(145);
+//
+//        System.out.println("Size of list: " + arr.size());
+//        for (Integer number : arr) {
+//            System.out.println("Number = " + number);
+//        }
+//        arr.remove(2);
+//
+//        System.out.println("After remove, Size of list: " + arr.size());
+//
+//        int i=0;
+//        for (Integer number : arr) {
+//            System.out.println("Number = " + number);
+//            if(i++==0)
+//                arr.remove(0);
+//        }
 
         //long t =
         //System.out.println(Test.getTimestamp("2023-01-01 14:50:10", "yyyy-MM-dd HH:mm:ss"));
 
+        Test t = new Test();
+        int[] candidates = {10,1,2,7,6,1,5,3,8};
+        int target = 8;
+        int num = 3;
+        t.backTracking(candidates, target, 0, 0, num);
+
+        System.out.println(t.result);
     }
 
 
-    /*
-class Solution {
-    public List<List<Integer>> levelOrder(Node root) {
-        if (root == null) {
-            return new ArrayList<List<Integer>>();
+    private void backTracking(int[] candidates, int target, int sum, int startIndex, int num) {
+//        if (sum == target) {
+//            result.add(new ArrayList(path));
+//            //return ;
+//        }
+        if (sum > target * 0.8 && sum < target * 1.2) {
+            result.add(new ArrayList(path));
+            return;
         }
-
-        List<List<Integer>> ans = new ArrayList<List<Integer>>();
-        Queue<Node> queue = new ArrayDeque<Node>();
-        queue.offer(root);
-
-        while (!queue.isEmpty()) {
-            int cnt = queue.size();
-            List<Integer> level = new ArrayList<Integer>();
-            for (int i = 0; i < cnt; ++i) {
-                Node cur = queue.poll();
-                level.add(cur.val);
-                for (Node child : cur.children) {
-                    queue.offer(child);
-                }
+        for (int i = startIndex; i < candidates.length; i++) {
+            if (sum + candidates[i] > target * 1.2) {
+                continue;
             }
-            ans.add(level);
+            if(path.size()>=num)
+            {
+                continue;
+            }
+
+            sum += candidates[i];
+            path.add(candidates[i]);
+
+            // 每个节点仅能选择一次，所以从下一位开始
+            backTracking(candidates, target, sum,i + 1, num);
+
+            sum -= candidates[i];
+            path.remove(path.size()-1);
         }
-
-        return ans;
     }
-}
-*/
-
 
 
 

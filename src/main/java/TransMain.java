@@ -1,48 +1,36 @@
 import org.neo4j.driver.*;
 import org.neo4j.driver.Record;
 
-import java.sql.Timestamp;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.logging.Level;
 
 import static org.neo4j.driver.Values.parameters;
 
+public class TransMain {
 
-/**
- *  资金交易链路追踪
- *
- */
-public class FindTransPath {
-
-    public static List<NodeInfo> endTransList= new ArrayList<NodeInfo>();
 
     //neo4j 链接
     Driver driver;
     Session session;
 
+    //输入参数及配置要求
     LimitElem limit;
     String cardId;
     String toCardId;
     String dealTime;
     Double money;
 
-    public static void main(String args[])
-    {
+    //路径数量
+    int count=0;
+
+    //路径堆栈
+    Deque<FindTransPathBT> stack = new LinkedList<FindTransPathBT>();
+
+    public  static void main(String[] args) throws Exception {
         if(args.length != 4) {
             System.out.println("usage: cardId toCardId dealTime money");
             return ;
         }
 
-        FindTransPath trans = new FindTransPath();
-
-        trans.cardId = args[0];
-        trans.toCardId = args[1];
-        trans.dealTime = args[2];
-        trans.money = Double.valueOf(args[3]);
-
-        trans.limit = new LimitElem();
 
         //删除节点：MATCH (n:ACCOUNT_TABLE) detach delete n;
         //样例1： 62319000001760*2131 62319000001760*2132 "2023-01-14 00:00:01" 30000
@@ -51,75 +39,140 @@ public class FindTransPath {
         //样例4： 62170039700023*8300 62170039700012*4861 "2020-12-03 18:48:53" 50000
         //样例5：
 
+
+        TransMain tm = new TransMain();
+
+        tm.cardId = args[0];
+        tm.toCardId = args[1];
+        tm.dealTime = args[2];
+        tm.money = Double.valueOf(args[3]);
+
+        tm.limit = new LimitElem();
+
         //获取初始节点信息
-        NodeInfo init = new NodeInfo(0, trans.cardId, trans.toCardId , Utils.getTimestamp( trans.dealTime, "yyyy-MM-dd HH:mm:ss"), trans.money);
+        NodeInfo init = new NodeInfo(0, tm.cardId, tm.toCardId , Utils.getTimestamp( tm.dealTime, "yyyy-MM-dd HH:mm:ss"), tm.money);
 
-        //初始化 消息列表，用于存储结果数据，每一层一个列表
-        List<List<NodeInfo>> info= new ArrayList<List<NodeInfo>>();
+        FindTransPathBT first = new FindTransPathBT();
+        first.queue.offer(init);
 
-        //创建队列存储交易层次信息，对数据进行广度优先搜索
-        Queue<NodeInfo> queue = new ArrayDeque<NodeInfo>();
+
+        tm.stack.push(first);
 
         //链接neo4j创建session
-        trans.initDB();
+        tm.initDB();
+        while(!tm.stack.isEmpty())
+        {
+            FindTransPathBT path = tm.stack.peek();
+            tm.stack.pop();
+            tm.findPath(path);
+        }
 
-        //把初始节点加入到队列中
-        queue.offer(init);
+        //关闭数据链接
+        tm.closeDB();
 
-        int n = 1;
+    }
+    public void findPath(FindTransPathBT path) throws Exception {
 
-        while (!queue.isEmpty()) {
+        while (!path.queue.isEmpty()) {
             //获取当前层级的节点数量
-            int count = queue.size();
+            int count = path.queue.size();
+
             //创建层级列表，存储这个层级的交易记录
-            List<NodeInfo> level = new ArrayList<NodeInfo>();
+            List<NodeInfo> levelList = new ArrayList<NodeInfo>();
+
+            int usedCount = 0;
+
+            //组合路径的开始，复原处理状态
+            if(path.combineFlag == true)
+            {
+                usedCount = path.usedNum;
+                levelList = path.levelList;
+                path.combineFlag = false;
+            }
 
             //循环处理当前层次的节点
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < count - usedCount; i++) {
 
                 //从队列中取出一个节点
-                NodeInfo node= queue.poll();
+                NodeInfo node= path.queue.poll();
 
                 //将取出的节点的起始账号与所有层级的尾部节点的目标账号进行比较，如果账号相同，将交易金额累加到当前节点
                 //解决场景如下：
                 //      1 -> 2 -> 3
                 //      1    ->   3
-                trans.sumEndTransInfo(node, endTransList);
+                sumEndTransInfo(node, path.endTransList);
 
                 //将取出的节点与历史节点进行比较，如果有相同的交易，则不进行记录
-                Boolean check = trans.checkSameTransInfo(node, info);
+                Boolean check = checkSameTransInfo(node, path.info);
                 if(check==true)
                 {
                     continue;
                 }
+
                 //把从队列中取出的信息存储到这个层级的列表中
-                level.add(node);
+                levelList.add(node);
 
                 //基于取出的节点查找有关系的交易节点
-                List<NodeInfo> nodeList = trans.getTransInfo(node, n, queue);
+                List<NodeInfo> nodeList = getTransInfo(node, path.levelNum, path.queue, path.endTransList);
 
-                //把交易节点依次插入到队列中，下一个层级计算会获取到此数据
-                for(int j = 0; j <nodeList.size(); j++ )
+                //单笔交易
+                if(nodeList.size()==1)
                 {
-                    queue.add(nodeList.get(j));
+                    path.queue.add(nodeList.get(0));
                 }
-                System.out.println(queue);
 
+                //组合交易
+                else if(nodeList.size()>1)
+                {
+                    //组合序号列表
+                    List<Integer> combine = new ArrayList<>();
+                    //组合序号列表结果集
+                    List<List<Integer>> allCombine = new ArrayList<>();
+                    double target = node.totalMoney;
 
+                    //通过回溯算法获取组合信息
+                    findCombineTrans(allCombine, combine, nodeList, target, 0, 0);
+                    System.out.println(allCombine);
 
+                    //没有组合
+                    if(allCombine.size()==0)
+                        nodeList = null;
+
+                    //多种组合把组合记录下来，放到堆栈中
+                    for (int j = 1; j < allCombine.size(); j++) {
+                            //路径拷贝，拷贝后放入到堆栈中
+                            path.levelList = levelList;
+                            FindTransPathBT bt = path.deepCopy();
+                            //设置组合标记
+                            bt.combineFlag = true;
+                            bt.usedNum = i + 1;
+                            for (int k = 0; k < allCombine.get(j).size(); k++) {
+                                bt.queue.add(nodeList.get(allCombine.get(j).get(k)));
+                            }
+                            //把组合路径放到堆栈中，
+                            stack.push(bt);
+                            System.out.println("stack:"+bt);
+                    }
+                    // 程序位置顺序不能调整，前面用到了节点的深度拷贝，不能先添加数据到节点
+                    if(allCombine.size()==1) {
+                        for (int k = 0; k < allCombine.get(0).size(); k++) {
+                            path.queue.add(nodeList.get(allCombine.get(0).get(k)));
+                        }
+                    }
+                }
             }
-            n++;
+            path.levelNum++;
 
             //把层级交易信息以列表方式存储，然后加入到列表结果集中
-            info.add(level);
+            path.info.add(levelList);
         }
-        System.out.println(info);
 
         // 保存结果集数据到数据库中
-        trans.saveResult(info);
+        count++;
+        saveResult(path.info, count);
 
-        //关闭数据链接
-        trans.closeDB();
+        System.out.println("result:"+path.info);
+
     }
 
     public void initDB() {
@@ -134,63 +187,55 @@ public class FindTransPath {
     }
 
 
-
-    public void saveResult(List<List<NodeInfo>> result){
+    public void saveResult(List<List<NodeInfo>> result, int num){
 
         //先删除结果数据 MATCH (n:ACCOUNT) detach delete n;
-        session.run("MATCH (n:ACCOUNT) detach delete n ");
+        String sql = String.format("MATCH (n:ACCOUNT%d) detach delete n ", num);
+        session.run(sql,parameters("num", String.valueOf(num)));
 
         for( List<NodeInfo> level: result ) {
             for(NodeInfo node: level) {
-                session.run("MERGE (n:ACCOUNT {card_no:$card_no}) ", parameters("card_no", node.toCardId));
+                sql = String.format("MERGE (n:ACCOUNT%d {card_no:$card_no}) ", num);
+                session.run( sql, parameters("num", String.valueOf(num), "card_no", node.toCardId));
                 for (int i = 0; i < node.cardId.size(); i++) {
-                    session.run("MERGE (n:ACCOUNT {card_no:$card_no}) ", parameters("card_no", node.cardId.get(i)));
-                    session.run("MATCH (a:ACCOUNT),(b:ACCOUNT) where " +
-                            "             a.card_no=$card_no " +
-                            "             and b.card_no=$to_card_no " +
-                            "            create (a)-[r:RES{trans_time:$trans_time,trans_amount:$trans_amount}]->(b)",
-                            parameters("card_no", node.cardId.get(i), "to_card_no", node.toCardId, "trans_time", node.timeToString(i), "trans_amount", node.money.get(i)));
+                    sql = String.format("MERGE (n:ACCOUNT%d {card_no:$card_no})", num) ;
+                    session.run( sql, parameters("num", String.valueOf(num), "card_no", node.cardId.get(i)));
+                    sql = String.format("MATCH (a:ACCOUNT%d),(b:ACCOUNT%d) where " +
+                            "           a.card_no=$card_no  " +
+                            "           and b.card_no=$to_card_no  " +
+                            "          create (a)-[r:RES{trans_time:$trans_time,trans_amount:$trans_amount}]->(b)", num, num);
+                    session.run( sql,
+                            parameters("num", String.valueOf(num), "card_no", node.cardId.get(i), "to_card_no", node.toCardId, "trans_time", node.timeToString(i), "trans_amount", node.money.get(i)));
                 }
             }
         }
     }
 
-    /**
-     * 有效交易数据筛选的过滤原则：
-     * 1.多笔交易金额累加值，在一定百分比范围内 如 80%~120%;
-     * 2.组合交易笔数，不能超过限定值 如 3;
-     * 3.组合交易单笔金额占比， 不能少于指定百分比 如 10%;
-     * 4.交易有效的最小金额， 少于指定值的交易不计入统计， 如 10000;
-     * 5.追踪交易的跳数， 限制追踪的跳数，如 0 不限制;
-     * 6.上下级交易间隔的有效时间， 设置追踪的有效时间， 如 2 两小时内发生的交易
-    **/
-
 
     /**
-     * 相同层级的数据对交易目标相同的账号进行合并
+     * 对目标相同的账号交易总和进行合并
      *
-     * @param nodeList
      * @param node
+     * @param endTransList
      * @return
-    **/
-    public List<NodeInfo> unionTransInfo(List<NodeInfo> nodeList, NodeInfo node, Queue<NodeInfo> queue)
+     */
+    public NodeInfo sumEndTransInfo(NodeInfo node, List<NodeInfo> endTransList)
     {
+        Iterator<NodeInfo> iterator = endTransList.iterator();
+        while (iterator.hasNext()){
+            NodeInfo nInfo=iterator.next();
 
-        for (NodeInfo qNode: queue) {
-            //此层级的节点，与先插入到此层级的列表进行比较，如果目标相同对数据进行合并；
-            if (qNode.toCardId.equals(node.toCardId)) {
-                qNode.totalMoney = qNode.totalMoney + node.totalMoney;
-                qNode.cardId.add(node.cardId.get(0));
-                qNode.money.add(node.money.get(0));
-                qNode.dealTime.add(node.dealTime.get(0));
-                return nodeList;
+            if(node.toCardId.equals(nInfo.toCardId))
+            {
+                double money = node.getTotalMoney() + nInfo.getTotalMoney();
+                //设置当前节点交易总额
+                node.setTotalMoney(money);
+                //移除当前尾部节点
+                iterator.remove();
             }
         }
-        nodeList.add(node);
-
-        return nodeList;
+        return node;
     }
-
 
     /**
      * 检查是否有相同的交易，如果有则过滤
@@ -221,31 +266,6 @@ public class FindTransPath {
         }
 
         return false;
-    }
-
-    /**
-     * 对目标相同的账号交易总和进行合并
-     *
-     * @param node
-     * @param endTransList
-     * @return
-     */
-    public NodeInfo sumEndTransInfo(NodeInfo node, List<NodeInfo> endTransList)
-    {
-        Iterator<NodeInfo> iterator = endTransList.iterator();
-        while (iterator.hasNext()){
-            NodeInfo nInfo=iterator.next();
-
-            if(node.toCardId.equals(nInfo.toCardId))
-            {
-                double money = node.getTotalMoney() + nInfo.getTotalMoney();
-                //设置当前节点交易总额
-                node.setTotalMoney(money);
-                //移除当前尾部节点
-                iterator.remove();
-            }
-        }
-        return node;
     }
 
     /**
@@ -281,6 +301,31 @@ public class FindTransPath {
         }
 
         return false;
+    }
+
+    /**
+     * 相同层级的数据对交易目标相同的账号进行合并
+     *
+     * @param nodeList
+     * @param node
+     * @return
+     **/
+    public List<NodeInfo> unionTransInfo(List<NodeInfo> nodeList, NodeInfo node, Queue<NodeInfo> queue)
+    {
+
+        for (NodeInfo qNode: queue) {
+            //此层级的节点，与先插入到此层级的列表进行比较，如果目标相同对数据进行合并；
+            if (qNode.toCardId.equals(node.toCardId)) {
+                qNode.totalMoney = qNode.totalMoney + node.totalMoney;
+                qNode.cardId.add(node.cardId.get(0));
+                qNode.money.add(node.money.get(0));
+                qNode.dealTime.add(node.dealTime.get(0));
+                return nodeList;
+            }
+        }
+        nodeList.add(node);
+
+        return nodeList;
     }
 
 
@@ -328,7 +373,6 @@ public class FindTransPath {
         }
     }
 
-
     /**
      * 根据当前交易信息获取下游交易信息
      * 可筛选的数据原则：
@@ -340,7 +384,7 @@ public class FindTransPath {
      * @param layer
      * @return
      */
-    public List<NodeInfo> getTransInfo(NodeInfo nodeInfo, int layer, Queue<NodeInfo> queue)
+    public List<NodeInfo> getTransInfo(NodeInfo nodeInfo, int layer, Queue<NodeInfo> queue, List<NodeInfo> endTransList)
     {
 
         List<NodeInfo> nodeList = new ArrayList<NodeInfo>();
@@ -371,27 +415,28 @@ public class FindTransPath {
             unionTransInfo(nodeList, n, queue);
         }
 
-        if(nodeList.size()>1)
-        {
-            List<Integer> combine = new ArrayList<>();
-            List<List<Integer>> allCombine = new ArrayList<>();
-            double target = nodeInfo.totalMoney;
-            System.out.println("target="+target);
-            System.out.println("NodeList="+nodeList);
-            findCombineTrans(allCombine, combine, nodeList, target, 0, 0);
-            System.out.println(allCombine);
 
-
-            if(allCombine.size()==0)
-                return null;
-
-            for (int i = 0; i < allCombine.get(0).size(); i++) {
-                combineList.add(nodeList.get(allCombine.get(0).get(i)));
-            }
-
-            nodeList = combineList;
-            System.out.println("FinalNodeList="+nodeList);
-        }
+//        if(nodeList.size()>1)
+//        {
+//            List<Integer> combine = new ArrayList<>();
+//            List<List<Integer>> allCombine = new ArrayList<>();
+//            double target = nodeInfo.totalMoney;
+//            System.out.println("target="+target);
+//            System.out.println("NodeList="+nodeList);
+//            findCombineTrans(allCombine, combine, nodeList, target, 0, 0);
+//            System.out.println(allCombine);
+//
+//
+//            if(allCombine.size()==0)
+//                return null;
+//
+//            for (int i = 0; i < allCombine.get(0).size(); i++) {
+//                combineList.add(nodeList.get(allCombine.get(0).get(i)));
+//            }
+//
+//            nodeList = combineList;
+//            System.out.println("FinalNodeList="+nodeList);
+//        }
 
         //尾节点，插入到尾部列表，后续用于跨层级的合并
         if(nodeList.size() == 0)
@@ -401,4 +446,5 @@ public class FindTransPath {
 
         return nodeList;
     }
+
 }

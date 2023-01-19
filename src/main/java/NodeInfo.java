@@ -1,23 +1,27 @@
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-public class NodeInfo {
+public class NodeInfo  implements Serializable{
     int level;
-    List<String> cardId =  new ArrayList<String>();
+    List<String> cardId ;
     String toCardId;
-    List<Long> dealTime =  new ArrayList<Long>();
-    List<Double> money = new ArrayList<Double>();
+    List<Long> dealTime ;
+    List<Double> money ;
     long maxDealTime ;
     Double totalMoney;
 
     public NodeInfo(int level, String cardId, String toCardId, long dealTime, double money) {
         this.level = level;
+        this.cardId =  new ArrayList<String>();
         this.cardId.add(cardId);
         this.toCardId = toCardId;
+        this.dealTime = new ArrayList<Long>();
         this.dealTime.add(dealTime) ;
+        this.money = new ArrayList<Double>();
         this.money.add(money);
         this.maxDealTime = dealTime;
         this.totalMoney = money;
@@ -92,6 +96,24 @@ public class NodeInfo {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
         return simpleDateFormat.format(date);
+    }
+
+
+    public NodeInfo deepCopy() throws Exception
+    {
+        // 将该对象序列化成流,因为写在流里的是对象的一个拷贝，而原对象仍然存在于JVM里面。所以利用这个特性可以实现对象的深拷贝
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+        ObjectOutputStream oos = new ObjectOutputStream(bos);
+        //this很关键，引用当前对象，当然，这是值传递
+        oos.writeObject(this);
+
+        // 将流序列化成对象
+        ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+
+        ObjectInputStream ois = new ObjectInputStream(bis);
+
+        return (NodeInfo) ois.readObject();
     }
 
     @Override
