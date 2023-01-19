@@ -105,8 +105,6 @@ public class FindTransPath {
                 }
                 System.out.println(queue);
 
-
-
             }
             n++;
 

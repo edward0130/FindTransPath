@@ -13,6 +13,7 @@ import static org.neo4j.driver.Values.parameters;
  */
 public class FindTransPathBT implements Serializable {
 
+    private static final long serialVersionUID = 12345L;
 
     //创建队列存储交易层次信息，对数据进行广度优先搜索
     Queue<NodeInfo> queue =  new ArrayDeque<>();
@@ -113,8 +114,6 @@ public class FindTransPathBT implements Serializable {
 
         return (FindTransPathBT) ois.readObject();
     }
-
-
 
 
 }

@@ -37,7 +37,7 @@ public class TransMain {
         //样例2： 62319000001760*21311 62319000001760*21312 "2023-01-15 00:00:01" 30000
         //样例3： 62319000001760*21321 62319000001760*21322 "2023-01-15 00:00:01" 30000
         //样例4： 62170039700023*8300 62170039700012*4861 "2020-12-03 18:48:53" 50000
-        //样例5：
+        //样例5： 62319000001760*21332 62319000001760*21333 "2023-01-15 00:00:17" 30000
 
 
         TransMain tm = new TransMain();
@@ -154,7 +154,7 @@ public class TransMain {
                             System.out.println("stack:"+bt);
                     }
                     // 程序位置顺序不能调整，前面用到了节点的深度拷贝，不能先添加数据到节点
-                    if(allCombine.size()==1) {
+                    if(allCombine.size() > 0) {
                         for (int k = 0; k < allCombine.get(0).size(); k++) {
                             path.queue.add(nodeList.get(allCombine.get(0).get(k)));
                         }
@@ -171,7 +171,7 @@ public class TransMain {
         count++;
         saveResult(path.info, count);
 
-        System.out.println("result:"+path.info);
+        System.out.println("result:"+path);
 
     }
 
