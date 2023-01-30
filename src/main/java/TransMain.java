@@ -20,7 +20,7 @@ public class TransMain {
     Double money;
 
     //路径数量
-    int count=0;
+    int pathCount=0;
 
     //路径堆栈
     Deque<FindTransPathBT> stack = new LinkedList<FindTransPathBT>();
@@ -38,6 +38,14 @@ public class TransMain {
         //样例3： 62319000001760*21321 62319000001760*21322 "2023-01-15 00:00:01" 30000
         //样例4： 62170039700023*8300 62170039700012*4861 "2020-12-03 18:48:53" 50000
         //样例5： 62319000001760*21332 62319000001760*21333 "2023-01-15 00:00:17" 30000
+
+        //测试数据：
+        // 62284833584614*2976 62284833586037*7278 "2017-08-04 15:33:01" 46057
+        // 62305201000224*2970 62284833581971*8772 "2017-08-18 00:21:42" 300000
+        // 62148312025968*2 62284801286897*7277 "2020-03-30 23:37:38" 200000
+        // 62284833586014*1571 62284800833506*1010 "2018-03-30 23:37:38" 300000
+        // 62284833586014*1571 62284800833506*1010 "2019-03-30 23:37:38" 300000
+        // 62284833586014*1571 62284800833506*1010 "2021-03-30 23:37:38" 400000
 
 
         TransMain tm = new TransMain();
@@ -80,18 +88,16 @@ public class TransMain {
             //创建层级列表，存储这个层级的交易记录
             List<NodeInfo> levelList = new ArrayList<NodeInfo>();
 
-            int usedCount = 0;
-
             //组合路径的开始，复原处理状态
             if(path.combineFlag == true)
             {
-                usedCount = path.usedNum;
+                count = path.queueNum;
                 levelList = path.levelList;
                 path.combineFlag = false;
             }
 
             //循环处理当前层次的节点
-            for (int i = 0; i < count - usedCount; i++) {
+            for (int i = 0; i < count ; i++) {
 
                 //从队列中取出一个节点
                 NodeInfo node= path.queue.poll();
@@ -145,7 +151,8 @@ public class TransMain {
                             FindTransPathBT bt = path.deepCopy();
                             //设置组合标记
                             bt.combineFlag = true;
-                            bt.usedNum = i + 1;
+                            //记录当前层级剩余的队列数量
+                            bt.queueNum = count - i - 1;
                             for (int k = 0; k < allCombine.get(j).size(); k++) {
                                 bt.queue.add(nodeList.get(allCombine.get(j).get(k)));
                             }
@@ -168,8 +175,8 @@ public class TransMain {
         }
 
         // 保存结果集数据到数据库中
-        count++;
-        saveResult(path.info, count);
+        pathCount++;
+        saveResult(path.info, pathCount);
 
         System.out.println("result:"+path);
 

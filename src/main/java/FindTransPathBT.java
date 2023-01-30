@@ -33,6 +33,8 @@ public class FindTransPathBT implements Serializable {
     //记录当前层级队列弹出了多少
     int usedNum = 0;
 
+    int queueNum = 0;
+
     //是否是组合标记
     Boolean combineFlag = false;
 
