@@ -24,11 +24,12 @@
 
 [资金交易链路追踪算法的设计与实现--OLTP.pdf](https://github.com/edward0130/FindTransPath/files/10992969/--OLTP.pdf)
 
-测试方法：
-1.首先往neo4j数据库写入测试数据，程序中读取数据的方法如下：
-MATCH (c:ACCOUNT_TABLE {card_no:$card_no})-[l:trans]->(r) RETURN c.card_no as cardId,r.card_no as toCardId,l.trans_time as dealTime, l.trans_amount as money order by dealTime 
-2.调用java程序参数如下：
+## 测试方法：
+### 1.首先往neo4j数据库写入测试数据，程序中读取数据的方法如下：
+ MATCH (c:ACCOUNT_TABLE {card_no:$card_no})-[l:trans]->(r) RETURN c.card_no as cardId,r.card_no as toCardId,l.trans_time as dealTime, l.trans_amount as money order by dealTime 
+### 2.调用java程序参数如下：
 usage: TransMain cardId toCardId dealTime money 
-3.结果数据写入到neo4j图库中
+62319000001760*21332 62319000001760*21333 "2023-01-15 00:00:17" 30000
+### 3.结果数据写入到neo4j图库中
 存储在图库的表名为ACCOUNT%d，多种组合序号自动+1
 
